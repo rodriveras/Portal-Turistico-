@@ -1,0 +1,844 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="initial-scale=1,user-scalable=no,maximum-scale=1,width=device-width">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <link rel="stylesheet" href="css/leaflet.css">
+        <link rel="stylesheet" href="css/L.Control.Layers.Tree.css">
+        <link rel="stylesheet" href="css/L.Control.Locate.min.css">
+        <link rel="stylesheet" href="css/qgis2web.css">
+        <link rel="stylesheet" href="css/fontawesome-all.min.css">
+        <link rel="stylesheet" href="css/leaflet.photon.css">
+        <style>
+        #map {
+            width: 894px;
+            height: 799px;
+        }
+        </style>
+        <title>Portal Web Turistico de San Fabian de Alico</title>
+    </head>
+    <body>
+        <div id="map">
+        </div>
+        <script src="js/qgis2web_expressions.js"></script>
+        <script src="js/leaflet.js"></script>
+        <script src="js/L.Control.Layers.Tree.min.js"></script>
+        <script src="js/L.Control.Locate.min.js"></script>
+        <script src="js/leaflet.rotatedMarker.js"></script>
+        <script src="js/leaflet.pattern.js"></script>
+        <script src="js/leaflet-hash.js"></script>
+        <script src="js/Autolinker.min.js"></script>
+        <script src="js/rbush.min.js"></script>
+        <script src="js/labelgun.min.js"></script>
+        <script src="js/labels.js"></script>
+        <script src="js/leaflet.photon.js"></script>
+        <script src="data/LimiteComunal_2.js"></script>
+        <script src="data/Ruta_Mountain_bike_3.js"></script>
+        <script src="data/SenderosdeTreking_4.js"></script>
+        <script src="data/Ruta_rafting_5.js"></script>
+        <script src="data/Residenciales_6.js"></script>
+        <script src="data/Turismo_aventura_7.js"></script>
+        <script src="data/Restaurantes_8.js"></script>
+        <script src="data/Centros_turisticos_9.js"></script>
+        <script src="data/Camping_10.js"></script>
+        <script src="data/Cabaas_11.js"></script>
+        <script src="data/Puntosturisticos_12.js"></script>
+        <script>
+        var map = L.map('map', {
+            zoomControl:false, maxZoom:28, minZoom:1
+        }).fitBounds([[-36.67985987803207,-71.7008496763294],[-36.41356066282884,-71.33358520886544]]);
+        var hash = new L.Hash(map);
+        map.attributionControl.setPrefix('<a href="https://github.com/tomchadwin/qgis2web" target="_blank">qgis2web</a> &middot; <a href="https://leafletjs.com" title="A JS library for interactive maps">Leaflet</a> &middot; <a href="https://qgis.org">QGIS</a>');
+        var autolinker = new Autolinker({truncate: {length: 30, location: 'smart'}});
+        // remove popup's row if "visible-with-data"
+        function removeEmptyRowsFromPopupContent(content, feature) {
+         var tempDiv = document.createElement('div');
+         tempDiv.innerHTML = content;
+         var rows = tempDiv.querySelectorAll('tr');
+         for (var i = 0; i < rows.length; i++) {
+             var td = rows[i].querySelector('td.visible-with-data');
+             var key = td ? td.id : '';
+             if (td && td.classList.contains('visible-with-data') && feature.properties[key] == null) {
+                 rows[i].parentNode.removeChild(rows[i]);
+             }
+         }
+         return tempDiv.innerHTML;
+        }
+        // modify popup if contains media
+        function addClassToPopupIfMedia(content, popup) {
+            var tempDiv = document.createElement('div');
+            tempDiv.innerHTML = content;
+            var imgTd = tempDiv.querySelector('td img');
+            if (imgTd) {
+                var src = imgTd.getAttribute('src');
+                if (/\.(jpg|jpeg|png|gif|bmp|webp|avif)$/i.test(src)) {
+                    popup._contentNode.classList.add('media');
+                    setTimeout(function() {
+                        popup.update();
+                    }, 10);
+                } else if (/\.(mp3|wav|ogg|aac)$/i.test(src)) {
+                    var audio = document.createElement('audio');
+                    audio.controls = true;
+                    audio.src = src;
+                    imgTd.parentNode.replaceChild(audio, imgTd);
+                    popup._contentNode.classList.add('media');
+                    setTimeout(function() {
+                        popup.setContent(tempDiv.innerHTML);
+                        popup.update();
+                    }, 10);
+                } else if (/\.(mp4|webm|ogg|mov)$/i.test(src)) {
+                    var video = document.createElement('video');
+                    video.controls = true;
+                    video.src = src;
+                    video.style.width = "400px";
+                    video.style.height = "300px";
+                    video.style.maxHeight = "60vh";
+                    video.style.maxWidth = "60vw";
+                    imgTd.parentNode.replaceChild(video, imgTd);
+                    popup._contentNode.classList.add('media');
+                    // Aggiorna il popup quando il video carica i metadati
+                    video.addEventListener('loadedmetadata', function() {
+                        popup.update();
+                    });
+                    setTimeout(function() {
+                        popup.setContent(tempDiv.innerHTML);
+                        popup.update();
+                    }, 10);
+                } else {
+                    popup._contentNode.classList.remove('media');
+                }
+            } else {
+                popup._contentNode.classList.remove('media');
+            }
+        }
+        var title = new L.Control({'position':'topleft'});
+        title.onAdd = function (map) {
+            this._div = L.DomUtil.create('div', 'info');
+            this.update();
+            return this._div;
+        };
+        title.update = function () {
+            this._div.innerHTML = '<h2>Portal Web Turistico de San Fabian de Alico</h2>';
+        };
+        title.addTo(map);
+        var zoomControl = L.control.zoom({
+            position: 'topleft'
+        }).addTo(map);
+        L.control.locate({locateOptions: {maxZoom: 19}}).addTo(map);
+        var bounds_group = new L.featureGroup([]);
+        function setBounds() {
+        }
+        map.createPane('pane_OpenStreetMap_0');
+        map.getPane('pane_OpenStreetMap_0').style.zIndex = 400;
+        var layer_OpenStreetMap_0 = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            pane: 'pane_OpenStreetMap_0',
+            opacity: 1.0,
+            attribution: '',
+            minZoom: 1,
+            maxZoom: 28,
+            minNativeZoom: 0,
+            maxNativeZoom: 19
+        });
+        layer_OpenStreetMap_0;
+        map.createPane('pane_Satelite_1');
+        map.getPane('pane_Satelite_1').style.zIndex = 401;
+        var layer_Satelite_1 = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            pane: 'pane_Satelite_1',
+            opacity: 0.775,
+            attribution: '',
+            minZoom: 1,
+            maxZoom: 28,
+            minNativeZoom: 0,
+            maxNativeZoom: 18
+        });
+        layer_Satelite_1;
+        map.addLayer(layer_Satelite_1);
+        function pop_LimiteComunal_2(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <th scope="row">NOM_REG</th>\
+                        <td>' + (feature.properties['NOM_REG'] !== null ? autolinker.link(String(feature.properties['NOM_REG']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['NOM_PROV'] !== null ? autolinker.link(String(feature.properties['NOM_PROV']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['NOM_COM'] !== null ? autolinker.link(String(feature.properties['NOM_COM']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['SHAPE_LENG'] !== null ? autolinker.link(String(feature.properties['SHAPE_LENG']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['DIS_ELEC'] !== null ? autolinker.link(String(feature.properties['DIS_ELEC']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['CIR_SENA'] !== null ? autolinker.link(String(feature.properties['CIR_SENA']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['COD_COMUNA'] !== null ? autolinker.link(String(feature.properties['COD_COMUNA']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['SHAPE_Le_1'] !== null ? autolinker.link(String(feature.properties['SHAPE_Le_1']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['SHAPE_Area'] !== null ? autolinker.link(String(feature.properties['SHAPE_Area']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_LimiteComunal_2_0() {
+            return {
+                pane: 'pane_LimiteComunal_2',
+                opacity: 1,
+                color: 'rgba(255,255,51,0.504)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 3.0,
+                fillOpacity: 0,
+                interactive: false,
+            }
+        }
+        map.createPane('pane_LimiteComunal_2');
+        map.getPane('pane_LimiteComunal_2').style.zIndex = 402;
+        map.getPane('pane_LimiteComunal_2').style['mix-blend-mode'] = 'normal';
+        var layer_LimiteComunal_2 = new L.geoJson(json_LimiteComunal_2, {
+            attribution: '',
+            interactive: false,
+            dataVar: 'json_LimiteComunal_2',
+            layerName: 'layer_LimiteComunal_2',
+            pane: 'pane_LimiteComunal_2',
+            onEachFeature: pop_LimiteComunal_2,
+            style: style_LimiteComunal_2_0,
+        });
+        bounds_group.addLayer(layer_LimiteComunal_2);
+        map.addLayer(layer_LimiteComunal_2);
+        function pop_Ruta_Mountain_bike_3(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name'] !== null ? autolinker.link(String(feature.properties['name']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['folders'] !== null ? autolinker.link(String(feature.properties['folders']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['descriptio'] !== null ? autolinker.link(String(feature.properties['descriptio']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['altitude'] !== null ? autolinker.link(String(feature.properties['altitude']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['alt_mode'] !== null ? autolinker.link(String(feature.properties['alt_mode']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['time_begin'] !== null ? autolinker.link(String(feature.properties['time_begin']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['time_end'] !== null ? autolinker.link(String(feature.properties['time_end']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['time_when'] !== null ? autolinker.link(String(feature.properties['time_when']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Ruta_Mountain_bike_3_0() {
+            return {
+                pane: 'pane_Ruta_Mountain_bike_3',
+                opacity: 1,
+                color: 'rgba(255,127,0,1.0)',
+                dashArray: '',
+                lineCap: 'round',
+                lineJoin: 'round',
+                weight: 3.0,
+                fillOpacity: 0,
+                interactive: false,
+            }
+        }
+        map.createPane('pane_Ruta_Mountain_bike_3');
+        map.getPane('pane_Ruta_Mountain_bike_3').style.zIndex = 403;
+        map.getPane('pane_Ruta_Mountain_bike_3').style['mix-blend-mode'] = 'normal';
+        var layer_Ruta_Mountain_bike_3 = new L.geoJson(json_Ruta_Mountain_bike_3, {
+            attribution: '',
+            interactive: false,
+            dataVar: 'json_Ruta_Mountain_bike_3',
+            layerName: 'layer_Ruta_Mountain_bike_3',
+            pane: 'pane_Ruta_Mountain_bike_3',
+            onEachFeature: pop_Ruta_Mountain_bike_3,
+            style: style_Ruta_Mountain_bike_3_0,
+        });
+        bounds_group.addLayer(layer_Ruta_Mountain_bike_3);
+        map.addLayer(layer_Ruta_Mountain_bike_3);
+        function pop_SenderosdeTreking_4(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <th scope="row">name</th>\
+                        <td>' + (feature.properties['name'] !== null ? autolinker.link(String(feature.properties['name']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['folders'] !== null ? autolinker.link(String(feature.properties['folders']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['descriptio'] !== null ? autolinker.link(String(feature.properties['descriptio']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['altitude'] !== null ? autolinker.link(String(feature.properties['altitude']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['alt_mode'] !== null ? autolinker.link(String(feature.properties['alt_mode']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['time_begin'] !== null ? autolinker.link(String(feature.properties['time_begin']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['time_end'] !== null ? autolinker.link(String(feature.properties['time_end']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['time_when'] !== null ? autolinker.link(String(feature.properties['time_when']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['layer'] !== null ? autolinker.link(String(feature.properties['layer']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['path'] !== null ? autolinker.link(String(feature.properties['path']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Kilometros</th>\
+                        <td>' + (feature.properties['Kilometros'] !== null ? autolinker.link(String(feature.properties['Kilometros']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_SenderosdeTreking_4_0() {
+            return {
+                pane: 'pane_SenderosdeTreking_4',
+                opacity: 1,
+                color: 'rgba(101,240,42,1.0)',
+                dashArray: '3.0,6.0',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 3.0,
+                fillOpacity: 0,
+                interactive: true,
+            }
+        }
+        map.createPane('pane_SenderosdeTreking_4');
+        map.getPane('pane_SenderosdeTreking_4').style.zIndex = 404;
+        map.getPane('pane_SenderosdeTreking_4').style['mix-blend-mode'] = 'normal';
+        var layer_SenderosdeTreking_4 = new L.geoJson(json_SenderosdeTreking_4, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_SenderosdeTreking_4',
+            layerName: 'layer_SenderosdeTreking_4',
+            pane: 'pane_SenderosdeTreking_4',
+            onEachFeature: pop_SenderosdeTreking_4,
+            style: style_SenderosdeTreking_4_0,
+        });
+        bounds_group.addLayer(layer_SenderosdeTreking_4);
+        map.addLayer(layer_SenderosdeTreking_4);
+        function pop_Ruta_rafting_5(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['id'] !== null ? autolinker.link(String(feature.properties['id']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Ruta_rafting_5_0() {
+            return {
+                pane: 'pane_Ruta_rafting_5',
+                opacity: 1,
+                color: 'rgba(72,123,182,1.0)',
+                dashArray: '',
+                lineCap: 'round',
+                lineJoin: 'round',
+                weight: 3.0,
+                fillOpacity: 0,
+                interactive: false,
+            }
+        }
+        map.createPane('pane_Ruta_rafting_5');
+        map.getPane('pane_Ruta_rafting_5').style.zIndex = 405;
+        map.getPane('pane_Ruta_rafting_5').style['mix-blend-mode'] = 'normal';
+        var layer_Ruta_rafting_5 = new L.geoJson(json_Ruta_rafting_5, {
+            attribution: '',
+            interactive: false,
+            dataVar: 'json_Ruta_rafting_5',
+            layerName: 'layer_Ruta_rafting_5',
+            pane: 'pane_Ruta_rafting_5',
+            onEachFeature: pop_Ruta_rafting_5,
+            style: style_Ruta_rafting_5_0,
+        });
+        bounds_group.addLayer(layer_Ruta_rafting_5);
+        map.addLayer(layer_Ruta_rafting_5);
+        function pop_Residenciales_6(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <th scope="row">name</th>\
+                        <td>' + (feature.properties['name'] !== null ? autolinker.link(String(feature.properties['name']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Residenciales_6_0() {
+            return {
+                pane: 'pane_Residenciales_6',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/Residenciales_6.svg',
+            iconSize: [21.280000000000012, 21.280000000000012]
+        }),
+                interactive: true,
+            }
+        }
+        map.createPane('pane_Residenciales_6');
+        map.getPane('pane_Residenciales_6').style.zIndex = 406;
+        map.getPane('pane_Residenciales_6').style['mix-blend-mode'] = 'normal';
+        var layer_Residenciales_6 = new L.geoJson(json_Residenciales_6, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_Residenciales_6',
+            layerName: 'layer_Residenciales_6',
+            pane: 'pane_Residenciales_6',
+            onEachFeature: pop_Residenciales_6,
+            pointToLayer: function (feature, latlng) {
+                var context = {
+                    feature: feature,
+                    variables: {}
+                };
+                return L.marker(latlng, style_Residenciales_6_0(feature));
+            },
+        });
+        bounds_group.addLayer(layer_Residenciales_6);
+        map.addLayer(layer_Residenciales_6);
+        function pop_Turismo_aventura_7(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <th scope="row">name</th>\
+                        <td>' + (feature.properties['name'] !== null ? autolinker.link(String(feature.properties['name']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Turismo_aventura_7_0() {
+            return {
+                pane: 'pane_Turismo_aventura_7',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/Turismo_aventura_7.svg',
+            iconSize: [30.4, 30.4]
+        }),
+                interactive: true,
+            }
+        }
+        map.createPane('pane_Turismo_aventura_7');
+        map.getPane('pane_Turismo_aventura_7').style.zIndex = 407;
+        map.getPane('pane_Turismo_aventura_7').style['mix-blend-mode'] = 'normal';
+        var layer_Turismo_aventura_7 = new L.geoJson(json_Turismo_aventura_7, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_Turismo_aventura_7',
+            layerName: 'layer_Turismo_aventura_7',
+            pane: 'pane_Turismo_aventura_7',
+            onEachFeature: pop_Turismo_aventura_7,
+            pointToLayer: function (feature, latlng) {
+                var context = {
+                    feature: feature,
+                    variables: {}
+                };
+                return L.marker(latlng, style_Turismo_aventura_7_0(feature));
+            },
+        });
+        bounds_group.addLayer(layer_Turismo_aventura_7);
+        map.addLayer(layer_Turismo_aventura_7);
+        function pop_Restaurantes_8(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <th scope="row">name</th>\
+                        <td>' + (feature.properties['name'] !== null ? autolinker.link(String(feature.properties['name']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Restaurantes_8_0() {
+            return {
+                pane: 'pane_Restaurantes_8',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/Restaurantes_8.svg',
+            iconSize: [28.120000000000015, 28.120000000000015]
+        }),
+                interactive: true,
+            }
+        }
+        map.createPane('pane_Restaurantes_8');
+        map.getPane('pane_Restaurantes_8').style.zIndex = 408;
+        map.getPane('pane_Restaurantes_8').style['mix-blend-mode'] = 'normal';
+        var layer_Restaurantes_8 = new L.geoJson(json_Restaurantes_8, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_Restaurantes_8',
+            layerName: 'layer_Restaurantes_8',
+            pane: 'pane_Restaurantes_8',
+            onEachFeature: pop_Restaurantes_8,
+            pointToLayer: function (feature, latlng) {
+                var context = {
+                    feature: feature,
+                    variables: {}
+                };
+                return L.marker(latlng, style_Restaurantes_8_0(feature));
+            },
+        });
+        bounds_group.addLayer(layer_Restaurantes_8);
+        map.addLayer(layer_Restaurantes_8);
+        function pop_Centros_turisticos_9(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <th scope="row">name</th>\
+                        <td>' + (feature.properties['name'] !== null ? autolinker.link(String(feature.properties['name']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Centros_turisticos_9_0() {
+            return {
+                pane: 'pane_Centros_turisticos_9',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/Centros_turisticos_9.svg',
+            iconSize: [25.84, 25.84]
+        }),
+                interactive: true,
+            }
+        }
+        map.createPane('pane_Centros_turisticos_9');
+        map.getPane('pane_Centros_turisticos_9').style.zIndex = 409;
+        map.getPane('pane_Centros_turisticos_9').style['mix-blend-mode'] = 'normal';
+        var layer_Centros_turisticos_9 = new L.geoJson(json_Centros_turisticos_9, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_Centros_turisticos_9',
+            layerName: 'layer_Centros_turisticos_9',
+            pane: 'pane_Centros_turisticos_9',
+            onEachFeature: pop_Centros_turisticos_9,
+            pointToLayer: function (feature, latlng) {
+                var context = {
+                    feature: feature,
+                    variables: {}
+                };
+                return L.marker(latlng, style_Centros_turisticos_9_0(feature));
+            },
+        });
+        bounds_group.addLayer(layer_Centros_turisticos_9);
+        map.addLayer(layer_Centros_turisticos_9);
+        function pop_Camping_10(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <th scope="row">name</th>\
+                        <td>' + (feature.properties['name'] !== null ? autolinker.link(String(feature.properties['name']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Camping_10_0() {
+            return {
+                pane: 'pane_Camping_10',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/Camping_10.svg',
+            iconSize: [28.880000000000006, 28.880000000000006]
+        }),
+                interactive: true,
+            }
+        }
+        map.createPane('pane_Camping_10');
+        map.getPane('pane_Camping_10').style.zIndex = 410;
+        map.getPane('pane_Camping_10').style['mix-blend-mode'] = 'normal';
+        var layer_Camping_10 = new L.geoJson(json_Camping_10, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_Camping_10',
+            layerName: 'layer_Camping_10',
+            pane: 'pane_Camping_10',
+            onEachFeature: pop_Camping_10,
+            pointToLayer: function (feature, latlng) {
+                var context = {
+                    feature: feature,
+                    variables: {}
+                };
+                return L.marker(latlng, style_Camping_10_0(feature));
+            },
+        });
+        bounds_group.addLayer(layer_Camping_10);
+        map.addLayer(layer_Camping_10);
+        function pop_Cabaas_11(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <th scope="row">name</th>\
+                        <td>' + (feature.properties['name'] !== null ? autolinker.link(String(feature.properties['name']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Cabaas_11_0() {
+            return {
+                pane: 'pane_Cabaas_11',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/Cabaas_11.svg',
+            iconSize: [27.360000000000007, 27.360000000000007]
+        }),
+                interactive: true,
+            }
+        }
+        map.createPane('pane_Cabaas_11');
+        map.getPane('pane_Cabaas_11').style.zIndex = 411;
+        map.getPane('pane_Cabaas_11').style['mix-blend-mode'] = 'normal';
+        var layer_Cabaas_11 = new L.geoJson(json_Cabaas_11, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_Cabaas_11',
+            layerName: 'layer_Cabaas_11',
+            pane: 'pane_Cabaas_11',
+            onEachFeature: pop_Cabaas_11,
+            pointToLayer: function (feature, latlng) {
+                var context = {
+                    feature: feature,
+                    variables: {}
+                };
+                return L.marker(latlng, style_Cabaas_11_0(feature));
+            },
+        });
+        bounds_group.addLayer(layer_Cabaas_11);
+        map.addLayer(layer_Cabaas_11);
+        function pop_Puntosturisticos_12(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <td class="visible-with-data" id="Name" colspan="2"><strong>Name</strong><br />' + (feature.properties['Name'] !== null ? autolinker.link(String(feature.properties['Name']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['descriptio'] !== null ? autolinker.link(String(feature.properties['descriptio']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['deportes'] !== null ? autolinker.link(String(feature.properties['deportes']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['cultura'] !== null ? autolinker.link(String(feature.properties['cultura']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['naturaleza'] !== null ? autolinker.link(String(feature.properties['naturaleza']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Tipo'] !== null ? autolinker.link(String(feature.properties['Tipo']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Destacado'] !== null ? autolinker.link(String(feature.properties['Destacado']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['x'] !== null ? autolinker.link(String(feature.properties['x']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['y'] !== null ? autolinker.link(String(feature.properties['y']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['foto'] !== null ? '<img src="images/' + String(feature.properties['foto']).replace(/[\\/:]/g, '_').trim().replace(/'/g, '\'').replace(/"/g, '&quot;') + '">' : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Puntosturisticos_12_0() {
+            return {
+                pane: 'pane_Puntosturisticos_12',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/Puntosturisticos_12.svg',
+            iconSize: [25.080000000000005, 25.080000000000005]
+        }),
+                interactive: true,
+            }
+        }
+        map.createPane('pane_Puntosturisticos_12');
+        map.getPane('pane_Puntosturisticos_12').style.zIndex = 412;
+        map.getPane('pane_Puntosturisticos_12').style['mix-blend-mode'] = 'normal';
+        var layer_Puntosturisticos_12 = new L.geoJson(json_Puntosturisticos_12, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_Puntosturisticos_12',
+            layerName: 'layer_Puntosturisticos_12',
+            pane: 'pane_Puntosturisticos_12',
+            onEachFeature: pop_Puntosturisticos_12,
+            pointToLayer: function (feature, latlng) {
+                var context = {
+                    feature: feature,
+                    variables: {}
+                };
+                return L.marker(latlng, style_Puntosturisticos_12_0(feature));
+            },
+        });
+        bounds_group.addLayer(layer_Puntosturisticos_12);
+        map.addLayer(layer_Puntosturisticos_12);
+        map.on("zoomend", function(e) {
+            if (map.getZoom() <= 19 && map.getZoom() >= 10) {
+                map.addLayer(layer_Puntosturisticos_12);
+            } else if (map.getZoom() > 19 || map.getZoom() < 10) {
+                map.removeLayer(layer_Puntosturisticos_12);
+            }
+        });
+            if (map.getZoom() <= 19 && map.getZoom() >= 10) {
+                map.addLayer(layer_Puntosturisticos_12);
+            } else if (map.getZoom() > 19 || map.getZoom() < 10) {
+                map.removeLayer(layer_Puntosturisticos_12);
+            }
+        var overlaysTree = [
+            {label: '<img src="legend/Puntosturisticos_12.png" /> Puntos turisticos', layer: layer_Puntosturisticos_12},
+            {label: '<img src="legend/Cabaas_11.png" /> Cabañas', layer: layer_Cabaas_11},
+            {label: '<img src="legend/Camping_10.png" /> Camping', layer: layer_Camping_10},
+            {label: '<img src="legend/Centros_turisticos_9.png" /> Centros_turisticos', layer: layer_Centros_turisticos_9},
+            {label: '<img src="legend/Restaurantes_8.png" /> Restaurantes', layer: layer_Restaurantes_8},
+            {label: '<img src="legend/Turismo_aventura_7.png" /> Turismo_aventura', layer: layer_Turismo_aventura_7},
+            {label: '<img src="legend/Residenciales_6.png" /> Residenciales', layer: layer_Residenciales_6},
+            {label: '<img src="legend/Ruta_rafting_5.png" /> Ruta_rafting', layer: layer_Ruta_rafting_5},
+            {label: '<img src="legend/SenderosdeTreking_4.png" /> Senderos de Treking', layer: layer_SenderosdeTreking_4},
+            {label: '<img src="legend/Ruta_Mountain_bike_3.png" /> Ruta_Mountain_bike', layer: layer_Ruta_Mountain_bike_3},
+            {label: '<img src="legend/LimiteComunal_2.png" /> Limite Comunal', layer: layer_LimiteComunal_2},
+            {label: "Satelite", layer: layer_Satelite_1, radioGroup: 'bm' },
+            {label: "OpenStreetMap", layer: layer_OpenStreetMap_0, radioGroup: 'bm' },]
+        var lay = L.control.layers.tree(null, overlaysTree,{
+            //namedToggle: true,
+            //selectorBack: false,
+            //closedSymbol: '&#8862; &#x1f5c0;',
+            //openedSymbol: '&#8863; &#x1f5c1;',
+            //collapseAll: 'Collapse all',
+            //expandAll: 'Expand all',
+            collapsed: false, 
+        });
+        lay.addTo(map);
+		document.addEventListener("DOMContentLoaded", function() {
+            // set new Layers List height which considers toggle icon
+            function newLayersListHeight() {
+                var layerScrollbarElement = document.querySelector('.leaflet-control-layers-scrollbar');
+                if (layerScrollbarElement) {
+                    var layersListElement = document.querySelector('.leaflet-control-layers-list');
+                    var originalHeight = layersListElement.style.height 
+                        || window.getComputedStyle(layersListElement).height;
+                    var newHeight = parseFloat(originalHeight) - 50;
+                    layersListElement.style.height = newHeight + 'px';
+                }
+            }
+            var isLayersListExpanded = true;
+            var controlLayersElement = document.querySelector('.leaflet-control-layers');
+            var toggleLayerControl = document.querySelector('.leaflet-control-layers-toggle');
+            // toggle Collapsed/Expanded and apply new Layers List height
+            toggleLayerControl.addEventListener('click', function() {
+                if (isLayersListExpanded) {
+                    controlLayersElement.classList.remove('leaflet-control-layers-expanded');
+                } else {
+                    controlLayersElement.classList.add('leaflet-control-layers-expanded');
+                }
+                isLayersListExpanded = !isLayersListExpanded;
+                newLayersListHeight()
+            });	
+			// apply new Layers List height if toggle layerstree
+			if (controlLayersElement) {
+				controlLayersElement.addEventListener('click', function(event) {
+					var toggleLayerHeaderPointer = event.target.closest('.leaflet-layerstree-header-pointer span');
+					if (toggleLayerHeaderPointer) {
+						newLayersListHeight();
+					}
+				});
+			}
+            // Collapsed/Expanded at Start to apply new height
+            setTimeout(function() {
+                toggleLayerControl.click();
+            }, 10);
+            setTimeout(function() {
+                toggleLayerControl.click();
+            }, 10);
+            // Collapsed touch/small screen
+            var isSmallScreen = window.innerWidth < 650;
+            if (isSmallScreen) {
+                setTimeout(function() {
+                    controlLayersElement.classList.remove('leaflet-control-layers-expanded');
+                    isLayersListExpanded = !isLayersListExpanded;
+                }, 500);
+            }  
+        });       
+        setBounds();
+        resetLabels([layer_Puntosturisticos_12]);
+        map.on("zoomend", function(){
+            resetLabels([layer_Puntosturisticos_12]);
+        });
+        map.on("layeradd", function(){
+            resetLabels([layer_Puntosturisticos_12]);
+        });
+        map.on("layerremove", function(){
+            resetLabels([layer_Puntosturisticos_12]);
+        });
+        </script>
+    </body>
+</html>
